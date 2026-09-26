@@ -1,6 +1,6 @@
 """
-app.py - Data Analyzer AI Platform with 4 Visual Dashboards, Custom Chart Studio, 
-Statistical QA Engine, and Executive Business Q&A
+app.py - Data Analyzer AI Platform featuring 4 Visual Dashboards 
+(with Integrated Custom Chart Builder inside Dashboard 1) and Interactive Q&A Engine.
 """
 
 import io
@@ -26,7 +26,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Theme & Layout Styling
+# Custom Styling
 st.markdown("""
     <style>
     .stApp { background-color: #F8FAFC; }
@@ -41,6 +41,14 @@ st.markdown("""
     }
     .metric-title { color: #64748b; font-size: 14px; font-weight: 600; text-transform: uppercase; }
     .metric-value { color: #1e293b; font-size: 26px; font-weight: 800; margin-top: 4px; }
+    .custom-box {
+        background-color: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
     .q-card {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
@@ -62,21 +70,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Dataset Caching & File Loading
+# Dataset Caching
 @st.cache_data
 def load_uploaded_file(file):
     try:
         if file.name.endswith('.csv'):
             df = pd.read_csv(file)
         else:
-            df = pd.read_excel(file)
-        df.columns = df.columns.str.strip()
+            df = pd.read_excel(file, engine='openpyxl')
+        df.columns = df.columns.astype(str).str.strip()
         return df
     except Exception as e:
-        st.error(f"Error loading dataset file: {e}")
+        st.error(f"Error loading file: {e}")
         return None
 
-# Data Quality Profiler
+# Profiler & QA Functions
 def analyze_data_quality(df):
     return {
         "total_rows": len(df),
@@ -85,7 +93,6 @@ def analyze_data_quality(df):
         "duplicate_rows": int(df.duplicated().sum())
     }
 
-# Statistical Question Generator
 def generate_analytical_questions(df):
     num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
@@ -94,73 +101,53 @@ def generate_analytical_questions(df):
     if cat_cols and num_cols:
         questions.append({
             "category": "Segment Breakdown",
-            "question": f"Which {cat_cols[0]} segment drives the highest total value in {num_cols[0]}?",
-            "purpose": f"Identifies highest volume contributors across {cat_cols[0]} categories."
+            "question": f"Which {cat_cols[0]} category yields the highest sum in {num_cols[0]}?",
+            "purpose": f"Identifies volume leaders across {cat_cols[0]}."
         })
     if len(num_cols) >= 2:
         questions.append({
             "category": "Correlation Test",
-            "question": f"Is there a linear correlation between {num_cols[0]} and {num_cols[1]}?",
-            "purpose": "Evaluates proportional growth relationships between metrics."
+            "question": f"How strong is the correlation between {num_cols[0]} and {num_cols[1]}?",
+            "purpose": "Evaluates relational dependencies across numeric variables."
         })
     if num_cols:
         questions.append({
-            "category": "Distribution & Outliers",
-            "question": f"Are there extreme outliers present in {num_cols[0]}?",
-            "purpose": "Highlights skewness or severe data variance."
+            "category": "Outlier Detection",
+            "question": f"Are there extreme skewness or outliers in {num_cols[0]}?",
+            "purpose": "Spotlights numerical distribution anomalies."
         })
     return questions
 
-# Business Executive Q&A Intelligence Engine
 def answer_business_question(df, question_text):
     num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
     q_lower = question_text.lower()
     
-    # Top / Leading Performers
     if any(k in q_lower for k in ['top', 'best', 'highest', 'max', 'leading']):
         if cat_cols and num_cols:
             top_res = df.groupby(cat_cols[0])[num_cols[0]].sum().sort_values(ascending=False).head(5)
-            best_cat = top_res.index[0]
-            best_val = top_res.iloc[0]
-            return (f"🏆 **Top Performer Findings:**\n\n"
-                    f"The top-ranked **{cat_cols[0]}** is **'{best_cat}'** with a cumulative **{num_cols[0]}** of **{best_val:,.2f}**.\n\n"
+            return (f"🏆 **Top Performer Analysis:**\n\n"
+                    f"The top-ranked **{cat_cols[0]}** is **'{top_res.index[0]}'** with total **{num_cols[0]}** of **{top_res.iloc[0]:,.2f}**.\n\n"
                     f"**Top 5 Leaderboard:**\n" + "\n".join([f"- **{k}**: {v:,.2f}" for k, v in top_res.items()]))
     
-    # Lowest / Bottom / At-Risk Drivers
-    elif any(k in q_lower for k in ['lowest', 'bottom', 'worst', 'min', 'least', 'risk']):
+    elif any(k in q_lower for k in ['lowest', 'bottom', 'worst', 'min', 'risk']):
         if cat_cols and num_cols:
             low_res = df.groupby(cat_cols[0])[num_cols[0]].sum().sort_values(ascending=True).head(5)
-            worst_cat = low_res.index[0]
-            worst_val = low_res.iloc[0]
-            return (f"⚠️ **Low-Performance Alert:**\n\n"
-                    f"The lowest-ranked **{cat_cols[0]}** is **'{worst_cat}'** with a total **{num_cols[0]}** of **{worst_val:,.2f}**.\n\n"
-                    f"**Bottom 5 Segment Breakdown:**\n" + "\n".join([f"- **{k}**: {v:,.2f}" for k, v in low_res.items()]))
+            return (f"⚠️ **Lowest Performance Breakdown:**\n\n"
+                    f"The lowest-ranked **{cat_cols[0]}** is **'{low_res.index[0]}'** with total **{num_cols[0]}** of **{low_res.iloc[0]:,.2f}**.\n\n"
+                    f"**Bottom 5 Segments:**\n" + "\n".join([f"- **{k}**: {v:,.2f}" for k, v in low_res.items()]))
 
-    # Average Benchmark Metrics
-    elif any(k in q_lower for k in ['average', 'mean', 'typical', 'avg']):
+    elif any(k in q_lower for k in ['average', 'mean', 'avg']):
         if num_cols:
-            avg_val = df[num_cols[0]].mean()
-            median_val = df[num_cols[0]].median()
-            return (f"📊 **Executive Average Breakdown:**\n\n"
-                    f"- **Mean {num_cols[0]}**: {avg_val:,.2f}\n"
-                    f"- **Median {num_cols[0]}**: {median_val:,.2f}")
+            return f"📊 **Average Benchmark:** Mean {num_cols[0]} is **{df[num_cols[0]].mean():,.2f}** (Median: {df[num_cols[0]].median():,.2f})."
 
-    # Aggregated Revenue / Total Volume
-    elif any(k in q_lower for k in ['total', 'sum', 'overall', 'revenue', 'sales', 'volume']):
+    elif any(k in q_lower for k in ['total', 'sum', 'overall', 'volume']):
         if num_cols:
-            total_val = df[num_cols[0]].sum()
-            return f"💰 **Total Aggregated Volume:** Cumulative **{num_cols[0]}** totals **{total_val:,.2f}** across all records."
+            return f"💰 **Total Aggregated Sum:** Cumulative {num_cols[0]} totals **{df[num_cols[0]].sum():,.2f}**."
 
-    # General Business Context Fallback
-    res = "📈 **General Business Data Overview:**\n\n"
-    if num_cols:
-        res += f"- Analyzed Numerical Metric: **{num_cols[0]}** (Total: {df[num_cols[0]].sum():,.2f}, Avg: {df[num_cols[0]].mean():,.2f})\n"
-    if cat_cols:
-        res += f"- Primary Segment Dimension: **{cat_cols[0]}** ({df[cat_cols[0]].nunique()} unique values)\n"
-    return res
+    return "📈 **General Dataset Summary:** Select specific metric columns to evaluate categorical breakdowns."
 
-# Machine Learning Predictive Feature Drivers
+# ML Feature Importance Model
 def train_risk_model(df, target_col):
     data = df.copy().dropna()
     for col in list(data.columns):
@@ -183,7 +170,7 @@ def train_risk_model(df, target_col):
     model.fit(X, y)
     return pd.DataFrame({'Feature': X.columns, 'Importance': model.feature_importances_}).sort_values(by='Importance', ascending=False)
 
-# PDF Report Generation (On-Demand)
+# PDF Generation
 def generate_pdf_report(quality_info, dashboards_dict):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -196,7 +183,7 @@ def generate_pdf_report(quality_info, dashboards_dict):
     story = [
         Paragraph("Data Analyzer AI - Executive Report", title_style),
         Spacer(1, 10),
-        Paragraph("1. Dataset Overview", heading_style)
+        Paragraph("1. Dataset Summary", heading_style)
     ]
 
     metrics_data = [
@@ -215,7 +202,7 @@ def generate_pdf_report(quality_info, dashboards_dict):
     story.append(t)
     story.append(Spacer(1, 12))
 
-    story.append(Paragraph("2. Interactive Visual Dashboards", heading_style))
+    story.append(Paragraph("2. Visual Dashboards", heading_style))
     for dash_title, charts in dashboards_dict.items():
         story.append(Paragraph(f"<b>{dash_title}</b>", body_style))
         for fig_title, fig in charts:
@@ -233,12 +220,12 @@ def generate_pdf_report(quality_info, dashboards_dict):
     buffer.seek(0)
     return buffer
 
-# Sidebar Navigation Panel
+# Sidebar Navigation
 st.sidebar.title("🧠 Data Analyzer AI")
-uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel Dataset", type=["csv", "xlsx"])
+uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel File", type=["csv", "xlsx"])
 
 if uploaded_file is not None:
-    with st.spinner("Processing dataset..."):
+    with st.spinner("Processing data..."):
         df = load_uploaded_file(uploaded_file)
 
     if df is not None:
@@ -248,21 +235,19 @@ if uploaded_file is not None:
         quality_info = analyze_data_quality(df)
         questions_list = generate_analytical_questions(df)
 
-        # -------------------------------------------------------------
-        # BUILD 4 DASHBOARDS (4 CHARTS EACH = 16 CHARTS TOTAL)
-        # -------------------------------------------------------------
+        # Build Standard Dashboards
         dashboards = {}
 
-        # Dashboard 1: Executive Overview
-        d1 = []
+        # Dashboard 1 Base Charts
         c1 = cat_cols[0] if cat_cols else df.columns[0]
         n1 = num_cols[0] if num_cols else df.columns[0]
         n2 = num_cols[1] if len(num_cols) > 1 else n1
 
-        d1.append(("Top Categorical Aggregation", px.bar(df.groupby(c1)[n1].sum().reset_index().head(10), x=c1, y=n1, color=c1, title=f"Top {c1} by {n1}")))
-        d1.append(("Feature Correlation Scatter", px.scatter(df, x=n1, y=n2, title=f"Scatter: {n1} vs {n2}")))
-        d1.append(("Proportion Share Donut Chart", px.pie(df, names=c1, title=f"Share: {c1}", hole=0.4)))
-        d1.append(("Correlation Matrix Heatmap", px.imshow(df[num_cols].corr() if len(num_cols) >= 2 else np.array([[1]]), title="Correlation Matrix Heatmap")))
+        d1 = [
+            ("Top Categorical Aggregation", px.bar(df.groupby(c1)[n1].sum().reset_index().head(10), x=c1, y=n1, color=c1, title=f"Top {c1} by {n1}")),
+            ("Feature Correlation Scatter", px.scatter(df, x=n1, y=n2, title=f"Scatter: {n1} vs {n2}")),
+            ("Proportion Share Donut Chart", px.pie(df, names=c1, title=f"Share: {c1}", hole=0.4))
+        ]
         dashboards["Dashboard 1: Executive Overview"] = d1
 
         # Dashboard 2: Distribution & Spread
@@ -284,27 +269,28 @@ if uploaded_file is not None:
         dashboards["Dashboard 3: Composition Analysis"] = d3
 
         # Dashboard 4: Advanced Relationships
-        d4 = []
-        d4.append(("Bivariate Feature Map", px.scatter(df, x=n1, y=n2, color=c1 if cat_cols else None, title="Multivariate Scatter Map")))
-        d4.append(("Category Variance Boxplot", px.box(df, x=c1, y=n1, title=f"{n1} Variance Across {c1}")))
-        d4.append(("Feature Density Breakdown", px.histogram(df, x=n1, color=c1 if cat_cols else None, title="Stacked Density Plot")))
-        d4.append(("Target Column Focus", px.scatter(df, x=n1, y=target_field if target_field in num_cols else n1, title=f"Impact on Target ({target_field})")))
+        d4 = [
+            ("Bivariate Feature Map", px.scatter(df, x=n1, y=n2, color=c1 if cat_cols else None, title="Multivariate Scatter Map")),
+            ("Category Variance Boxplot", px.box(df, x=c1, y=n1, title=f"{n1} Variance Across {c1}")),
+            ("Feature Density Breakdown", px.histogram(df, x=n1, color=c1 if cat_cols else None, title="Stacked Density Plot")),
+            ("Target Column Focus", px.scatter(df, x=n1, y=target_field if target_field in num_cols else n1, title=f"Impact on Target ({target_field})"))
+        ]
         dashboards["Dashboard 4: Advanced Relationships"] = d4
 
-        # Main UI Tab Layout Navigation
+        # Main Layout Navigation
         st.title("Data Analyzer AI Platform")
         
-        tab_list = [
+        tabs = st.tabs([
             "📋 Dataset Overview", 
-            "📊 Dashboard 1", "📊 Dashboard 2", "📊 Dashboard 3", "📊 Dashboard 4",
-            "🎨 Custom Chart Studio", 
-            "💼 Business Q&A Assistant",
-            "❓ Analytical QA Engine", 
+            "📊 Dashboard 1 (With Custom Chart)", 
+            "📊 Dashboard 2", 
+            "📊 Dashboard 3", 
+            "📊 Dashboard 4", 
+            "💬 Interactive Q&A Engine", 
             "🤖 Feature Importance"
-        ]
-        tabs = st.tabs(tab_list)
+        ])
 
-        # Tab 1: Dataset Summary
+        # Tab 1: Dataset Overview
         with tabs[0]:
             st.subheader("Dataset Overview Metrics")
             m1, m2, m3, m4 = st.columns(4)
@@ -316,8 +302,64 @@ if uploaded_file is not None:
             st.markdown("---")
             st.dataframe(df.head(10), use_container_width=True)
 
-        # Tabs 2 to 5: 4 Visual Dashboards
-        for idx, (dash_name, chart_list) in enumerate(dashboards.items(), start=1):
+        # Tab 2: DASHBOARD 1 (INTEGRATED WITH CUSTOM CHART BUILDER)
+        with tabs[1]:
+            st.subheader("📊 Dashboard 1: Executive Overview & Custom Chart Studio")
+            
+            # Row 1: Standard Executive Visuals
+            row1_col1, row1_col2 = st.columns(2)
+            with row1_col1:
+                st.plotly_chart(d1[0][1], use_container_width=True)
+            with row1_col2:
+                st.plotly_chart(d1[1][1], use_container_width=True)
+
+            row2_col1, row2_col2 = st.columns(2)
+            with row2_col1:
+                st.plotly_chart(d1[2][1], use_container_width=True)
+
+            # INTEGRATED CUSTOMIZABLE CHART PANEL INSIDE DASHBOARD 1
+            with row2_col2:
+                st.markdown("### 🎨 Integrated Custom Chart Builder")
+                
+                c_col1, c_col2 = st.columns(2)
+                with c_col1:
+                    chart_type = st.selectbox("Chart Type:", ["Bar Chart", "Line Chart", "Scatter Plot", "Histogram", "Box Plot", "Pie Chart"], key="d1_type")
+                    x_col = st.selectbox("X-Axis Field:", df.columns, index=0, key="d1_x")
+                with c_col2:
+                    y_col = st.selectbox("Y-Axis Field:", [None] + list(df.columns), index=1 if len(df.columns) > 1 else 0, key="d1_y")
+                    color_col = st.selectbox("Color / Group Field:", [None] + list(df.columns), key="d1_color")
+
+                custom_title = st.text_input("Chart Title:", value=f"Customized {chart_type}: {x_col}", key="d1_title")
+
+                # Generate Dynamic Customized Visualization
+                try:
+                    if chart_type == "Bar Chart":
+                        if y_col:
+                            agg_df = df.groupby(x_col)[y_col].sum().reset_index()
+                            custom_fig = px.bar(agg_df, x=x_col, y=y_col, color=color_col if color_col else x_col, title=custom_title)
+                        else:
+                            custom_fig = px.bar(df[x_col].value_counts().reset_index(), x=x_col, y='count', color=x_col, title=custom_title)
+                    elif chart_type == "Line Chart":
+                        custom_fig = px.line(df, x=x_col, y=y_col, color=color_col, title=custom_title)
+                    elif chart_type == "Scatter Plot":
+                        custom_fig = px.scatter(df, x=x_col, y=y_col, color=color_col, title=custom_title)
+                    elif chart_type == "Histogram":
+                        custom_fig = px.histogram(df, x=x_col, color=color_col, title=custom_title)
+                    elif chart_type == "Box Plot":
+                        custom_fig = px.box(df, x=x_col if y_col else None, y=y_col if y_col else x_col, color=color_col, title=custom_title)
+                    elif chart_type == "Pie Chart":
+                        if y_col:
+                            custom_fig = px.pie(df, names=x_col, values=y_col, title=custom_title, hole=0.3)
+                        else:
+                            custom_fig = px.pie(df, names=x_col, title=custom_title, hole=0.3)
+
+                    custom_fig.update_layout(template="plotly_white", height=380)
+                    st.plotly_chart(custom_fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error building custom chart: {e}")
+
+        # Tabs 3, 4, 5: Dashboards 2, 3, and 4
+        for idx, (dash_name, chart_list) in enumerate(list(dashboards.items())[1:], start=2):
             with tabs[idx]:
                 st.subheader(f"📊 {dash_name}")
                 row1_col1, row1_col2 = st.columns(2)
@@ -332,136 +374,69 @@ if uploaded_file is not None:
                 with row2_col2:
                     st.plotly_chart(chart_list[3][1], use_container_width=True)
 
-        # Tab 6: CUSTOM CHART STUDIO BUILDER
+        # Tab 6: COMBINED INTERACTIVE Q&A ENGINE (BUSINESS + ANALYTICAL QA)
         with tabs[5]:
-            st.subheader("🎨 Custom Chart Studio")
-            st.write("Configure dynamic interactive visualizations tailored to your dataset.")
-            
-            c_col1, c_col2, c_col3 = st.columns(3)
-            with c_col1:
-                chart_type = st.selectbox("Select Chart Type:", ["Bar Chart", "Line Chart", "Scatter Plot", "Histogram", "Box Plot", "Pie / Donut Chart"])
-                x_col = st.selectbox("Select X-Axis Field:", df.columns, index=0)
-            with c_col2:
-                y_col = st.selectbox("Select Y-Axis Field (Optional for Histograms):", [None] + list(df.columns), index=1 if len(df.columns) > 1 else 0)
-                color_col = st.selectbox("Select Color/Group Field (Optional):", [None] + list(df.columns))
-            with c_col3:
-                color_theme = st.selectbox("Select Color Palette:", ["Viridis", "Plasma", "Turbo", "Spectral", "Bluered"])
-                custom_title = st.text_input("Chart Title:", value=f"Custom {chart_type}: {x_col}" + (f" vs {y_col}" if y_col else ""))
+            st.subheader("💬 Interactive Data & Executive Q&A Engine")
+            st.write("Ask operational questions or inspect automated data hypotheses.")
 
-            # Build Custom Plotly Visualization
-            try:
-                if chart_type == "Bar Chart":
-                    if y_col:
-                        agg_df = df.groupby(x_col)[y_col].sum().reset_index()
-                        custom_fig = px.bar(agg_df, x=x_col, y=y_col, color=color_col if color_col else x_col, title=custom_title, color_continuous_scale=color_theme.lower())
-                    else:
-                        custom_fig = px.bar(df[x_col].value_counts().reset_index(), x=x_col, y='count', color=x_col, title=custom_title)
-                
-                elif chart_type == "Line Chart":
-                    custom_fig = px.line(df, x=x_col, y=y_col, color=color_col, title=custom_title)
-                
-                elif chart_type == "Scatter Plot":
-                    custom_fig = px.scatter(df, x=x_col, y=y_col, color=color_col, title=custom_title)
-                
-                elif chart_type == "Histogram":
-                    custom_fig = px.histogram(df, x=x_col, color=color_col, title=custom_title)
-                
-                elif chart_type == "Box Plot":
-                    custom_fig = px.box(df, x=x_col if y_col else None, y=y_col if y_col else x_col, color=color_col, title=custom_title)
-                
-                elif chart_type == "Pie / Donut Chart":
-                    if y_col:
-                        custom_fig = px.pie(df, names=x_col, values=y_col, title=custom_title, hole=0.4)
-                    else:
-                        custom_fig = px.pie(df, names=x_col, title=custom_title, hole=0.4)
+            qa_tab1, qa_tab2 = st.tabs(["💼 Business Q&A", "❓ Analytical & Statistical QA"])
 
-                custom_fig.update_layout(template="plotly_white", height=500)
-                st.plotly_chart(custom_fig, use_container_width=True)
+            with qa_tab1:
+                st.markdown("### Executive Business Query Assistant")
+                preset_q = st.selectbox("Select a Preset Business Query:", [
+                    "Custom Question",
+                    "What is our top performing category?",
+                    "Which category represents our highest risk / lowest performance?",
+                    "What is the average metric benchmark?",
+                    "What is the total overall volume?"
+                ])
 
-            except Exception as e:
-                st.error(f"Unable to render custom visualization with selected options: {e}")
-
-        # Tab 7: EXECUTIVE BUSINESS Q&A ENGINE
-        with tabs[6]:
-            st.subheader("💼 Executive Business Q&A Engine")
-            st.write("Extract revenue drivers, operational benchmarks, and risk metrics using business-focused queries.")
-
-            # Automated Executive Summary Insights
-            st.markdown("### 📊 Automated Executive Insights")
-            if cat_cols and num_cols:
-                top_group = df.groupby(cat_cols[0])[num_cols[0]].sum().idxmax()
-                top_val = df.groupby(cat_cols[0])[num_cols[0]].sum().max()
-                
-                st.markdown(f"""
-                <div class="biz-card">
-                    <div class="biz-title">🎯 Primary Business Driver</div>
-                    <p style="margin:0; color:#334155;">
-                        The leading performer in <b>{cat_cols[0]}</b> is <b>{top_group}</b> with <b>{top_val:,.2f}</b> in cumulative <b>{num_cols[0]}</b>.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.markdown("---")
-            st.markdown("### 💬 Ask a Business Question")
-            
-            preset_q = st.selectbox("Select or Type a Business Query:", [
-                "Custom Question",
-                "What is our top performing category?",
-                "Which category represents our highest risk / lowest performance?",
-                "What is the average metric benchmark?",
-                "What is the total overall volume?"
-            ])
-
-            if preset_q == "Custom Question":
-                biz_user_q = st.text_input("Enter your business query (e.g., 'What is the highest performing segment?'):")
-            else:
-                biz_user_q = preset_q
-
-            if biz_user_q:
-                ans = answer_business_question(df, biz_user_q)
-                st.info(ans)
-
-        # Tab 8: STATISTICAL ANALYTICAL QA ENGINE
-        with tabs[7]:
-            st.subheader("❓ Statistical Analytical QA Engine")
-            st.write("Explore automated statistical hypotheses or query columns directly.")
-            
-            st.markdown("### Pre-Generated Data Hypotheses")
-            for q in questions_list:
-                st.markdown(f"""
-                <div class="q-card">
-                    <div class="q-title">[{q['category']}] {q['question']}</div>
-                    <p style="margin-top: 5px; color: #475569;"><b>Purpose:</b> {q['purpose']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.markdown("---")
-            st.markdown("### 🔍 Ask a Data Question")
-            user_question = st.text_input("Enter a specific question about dataset variables:")
-            
-            if user_question:
-                matched_cols = [c for c in df.columns if c.lower() in user_question.lower()]
-                if matched_cols and num_cols:
-                    st.success(f"🔍 Analyzing columns: **{', '.join(matched_cols)}**")
-                    st.dataframe(df.groupby(matched_cols[0])[num_cols[0]].describe(), use_container_width=True)
+                if preset_q == "Custom Question":
+                    biz_user_q = st.text_input("Type your business query (e.g., 'What is the top category?'):")
                 else:
-                    st.dataframe(df.describe().T, use_container_width=True)
+                    biz_user_q = preset_q
 
-        # Tab 9: FEATURE IMPORTANCE
-        with tabs[8]:
-            st.subheader(f"Predictive Driver Analysis for Target '{target_field}'")
+                if biz_user_q:
+                    ans = answer_business_question(df, biz_user_q)
+                    st.info(ans)
+
+            with qa_tab2:
+                st.markdown("### Pre-Generated Data Hypotheses")
+                for q in questions_list:
+                    st.markdown(f"""
+                    <div class="q-card">
+                        <div class="q-title">[{q['category']}] {q['question']}</div>
+                        <p style="margin-top: 5px; color: #475569;"><b>Purpose:</b> {q['purpose']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("---")
+                st.markdown("### 🔍 Specific Column Inspector Question")
+                user_question = st.text_input("Ask about specific dataset columns or variables:")
+                
+                if user_question:
+                    matched_cols = [c for c in df.columns if c.lower() in user_question.lower()]
+                    if matched_cols and num_cols:
+                        st.success(f"🔍 Analyzing columns: **{', '.join(matched_cols)}**")
+                        st.dataframe(df.groupby(matched_cols[0])[num_cols[0]].describe(), use_container_width=True)
+                    else:
+                        st.dataframe(df.describe().T, use_container_width=True)
+
+        # Tab 7: FEATURE IMPORTANCE
+        with tabs[6]:
+            st.subheader(f"Predictive Feature Drivers for Target Variable '{target_field}'")
             try:
                 imp_df = train_risk_model(df, target_field)
-                fig_imp = px.bar(imp_df.head(10), x='Importance', y='Feature', orientation='h', title="Top Driver Variables")
+                fig_imp = px.bar(imp_df.head(10), x='Importance', y='Feature', orientation='h', title="Top Drivers Importance")
                 fig_imp.update_layout(yaxis={'categoryorder': 'total ascending'}, height=420, template="plotly_white")
                 st.plotly_chart(fig_imp, use_container_width=True)
             except Exception as e:
-                st.error(f"Could not build predictive model: {e}")
+                st.error(f"Could not calculate predictive drivers: {e}")
 
-        # PDF Report Download Trigger
+        # PDF Executive Report Download
         st.sidebar.markdown("---")
-        if st.sidebar.button("📄 Generate PDF Executive Report"):
-            with st.spinner("Creating PDF report with chart snapshots..."):
+        if st.sidebar.button("📄 Export PDF Executive Report"):
+            with st.spinner("Compiling PDF Executive Report with visual summaries..."):
                 pdf_bytes = generate_pdf_report(quality_info, dashboards)
                 st.sidebar.download_button(
                     label="⬇️ Download PDF Report",
@@ -471,4 +446,4 @@ if uploaded_file is not None:
                 )
 
 else:
-    st.info("👈 Upload a CSV or Excel file in the sidebar to activate all 4 dashboards, custom chart studio, and Q&A engines.")
+    st.info("👈 Upload a CSV or Excel file using the sidebar to render the dashboards and integrated custom chart controls.")
