@@ -10,7 +10,6 @@ import numpy as np
 import plotly.express as px
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.utils.multiclass import type_of_target
 
 # ReportLab Imports for PDF Generation
 from reportlab.lib.pagesizes import letter
@@ -95,7 +94,7 @@ def analyze_data_quality(df):
 
 def generate_analytical_questions(df):
     num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    cat_cols = df.select_dtypes(include=['object', 'category', 'string']).columns.tolist()
     
     questions = []
     if cat_cols and num_cols:
@@ -120,7 +119,7 @@ def generate_analytical_questions(df):
 
 def answer_business_question(df, question_text):
     num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    cat_cols = df.select_dtypes(include=['object', 'category', 'string']).columns.tolist()
     q_lower = question_text.lower()
     
     if any(k in q_lower for k in ['top', 'best', 'highest', 'max', 'leading']):
@@ -147,24 +146,32 @@ def answer_business_question(df, question_text):
 
     return "📈 **General Dataset Summary:** Select specific metric columns to evaluate categorical breakdowns."
 
-# ML Feature Importance Model
+# Robust ML Feature Importance Model
 def train_risk_model(df, target_col):
     data = df.copy().dropna()
+    
+    # Drop identifier columns or high cardinality features
     for col in list(data.columns):
         if col != target_col and (col.lower().endswith('id') or data[col].nunique() > 100):
             data = data.drop(columns=[col])
 
-    cat_cols = data.select_dtypes(include=['object', 'category']).columns.tolist()
-    for col in cat_cols:
-        if col != target_col:
-            data[col] = LabelEncoder().fit_transform(data[col].astype(str))
-        
+    if data.empty or target_col not in data.columns or len(data.columns) <= 1:
+        return pd.DataFrame({'Feature': ['Insufficient Data'], 'Importance': [0.0]})
+
+    # Encode all non-numeric features
     X = data.drop(columns=[target_col])
+    for col in X.columns:
+        if not np.issubdtype(X[col].dtype, np.number):
+            X[col] = LabelEncoder().fit_transform(X[col].astype(str))
+
     y = data[target_col]
     
-    if type_of_target(y) == 'continuous':
+    # Target Type Check
+    if np.issubdtype(y.dtype, np.number) and y.nunique() > 20:
         model = RandomForestRegressor(n_estimators=50, random_state=42)
     else:
+        if not np.issubdtype(y.dtype, np.number):
+            y = LabelEncoder().fit_transform(y.astype(str))
         model = RandomForestClassifier(n_estimators=50, random_state=42)
         
     model.fit(X, y)
@@ -231,7 +238,7 @@ if uploaded_file is not None:
     if df is not None:
         target_field = st.sidebar.selectbox("Select Target Variable:", df.columns)
         num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        cat_cols = df.select_dtypes(include=['object', 'category', 'string']).columns.tolist()
         quality_info = analyze_data_quality(df)
         questions_list = generate_analytical_questions(df)
 
@@ -300,7 +307,7 @@ if uploaded_file is not None:
             m4.markdown(f'<div class="metric-card"><div class="metric-title">Categorical Columns</div><div class="metric-value">{len(cat_cols)}</div></div>', unsafe_allow_html=True)
 
             st.markdown("---")
-            st.dataframe(df.head(10), use_container_width=True)
+            st.dataframe(df.head(10), width='stretch')
 
         # Tab 2: DASHBOARD 1 (INTEGRATED WITH CUSTOM CHART BUILDER)
         with tabs[1]:
@@ -309,13 +316,13 @@ if uploaded_file is not None:
             # Row 1: Standard Executive Visuals
             row1_col1, row1_col2 = st.columns(2)
             with row1_col1:
-                st.plotly_chart(d1[0][1], use_container_width=True)
+                st.plotly_chart(d1[0][1], width='stretch')
             with row1_col2:
-                st.plotly_chart(d1[1][1], use_container_width=True)
+                st.plotly_chart(d1[1][1], width='stretch')
 
             row2_col1, row2_col2 = st.columns(2)
             with row2_col1:
-                st.plotly_chart(d1[2][1], use_container_width=True)
+                st.plotly_chart(d1[2][1], width='stretch')
 
             # INTEGRATED CUSTOMIZABLE CHART PANEL INSIDE DASHBOARD 1
             with row2_col2:
@@ -354,7 +361,7 @@ if uploaded_file is not None:
                             custom_fig = px.pie(df, names=x_col, title=custom_title, hole=0.3)
 
                     custom_fig.update_layout(template="plotly_white", height=380)
-                    st.plotly_chart(custom_fig, use_container_width=True)
+                    st.plotly_chart(custom_fig, width='stretch')
                 except Exception as e:
                     st.error(f"Error building custom chart: {e}")
 
@@ -364,15 +371,15 @@ if uploaded_file is not None:
                 st.subheader(f"📊 {dash_name}")
                 row1_col1, row1_col2 = st.columns(2)
                 with row1_col1:
-                    st.plotly_chart(chart_list[0][1], use_container_width=True)
+                    st.plotly_chart(chart_list[0][1], width='stretch')
                 with row1_col2:
-                    st.plotly_chart(chart_list[1][1], use_container_width=True)
+                    st.plotly_chart(chart_list[1][1], width='stretch')
 
                 row2_col1, row2_col2 = st.columns(2)
                 with row2_col1:
-                    st.plotly_chart(chart_list[2][1], use_container_width=True)
+                    st.plotly_chart(chart_list[2][1], width='stretch')
                 with row2_col2:
-                    st.plotly_chart(chart_list[3][1], use_container_width=True)
+                    st.plotly_chart(chart_list[3][1], width='stretch')
 
         # Tab 6: COMBINED INTERACTIVE Q&A ENGINE (BUSINESS + ANALYTICAL QA)
         with tabs[5]:
@@ -418,9 +425,9 @@ if uploaded_file is not None:
                     matched_cols = [c for c in df.columns if c.lower() in user_question.lower()]
                     if matched_cols and num_cols:
                         st.success(f"🔍 Analyzing columns: **{', '.join(matched_cols)}**")
-                        st.dataframe(df.groupby(matched_cols[0])[num_cols[0]].describe(), use_container_width=True)
+                        st.dataframe(df.groupby(matched_cols[0])[num_cols[0]].describe(), width='stretch')
                     else:
-                        st.dataframe(df.describe().T, use_container_width=True)
+                        st.dataframe(df.describe().T, width='stretch')
 
         # Tab 7: FEATURE IMPORTANCE
         with tabs[6]:
@@ -429,7 +436,7 @@ if uploaded_file is not None:
                 imp_df = train_risk_model(df, target_field)
                 fig_imp = px.bar(imp_df.head(10), x='Importance', y='Feature', orientation='h', title="Top Drivers Importance")
                 fig_imp.update_layout(yaxis={'categoryorder': 'total ascending'}, height=420, template="plotly_white")
-                st.plotly_chart(fig_imp, use_container_width=True)
+                st.plotly_chart(fig_imp, width='stretch')
             except Exception as e:
                 st.error(f"Could not calculate predictive drivers: {e}")
 
